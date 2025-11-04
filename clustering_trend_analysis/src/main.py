@@ -1,10 +1,9 @@
 import argparse
 import logging
 from pathlib import Path
-
 import pandas as pd
 
-from .load_data import load_json_to_df
+from .load_data import load_selected_fields  # ✅ updated import
 from .embeddings import generate_embeddings
 from .clustering import run_clustering_and_pca
 from .visualization import create_interactive_visualizations
@@ -24,13 +23,18 @@ def configure_logging(verbosity: int) -> None:
 
 def main() -> None:
 	parser = argparse.ArgumentParser(
-		description="Clustering and Identification of Trends in Summarised PDF Data",
+		description="Clustering and Visualization of Data (JSON or CSV)",
 	)
 	parser.add_argument(
 		"--data",
 		type=Path,
-		default=Path(__file__).resolve().parent.parent / "data" / "sample_data.json",
-		help="Path to input JSON file",
+		required=True,
+		help="Path to input JSON or CSV file",
+	)
+	parser.add_argument(
+		"--fields",
+		nargs="+",
+		help="Names of the 4 fields/columns to use for clustering",
 	)
 	parser.add_argument(
 		"--output-dir",
@@ -70,33 +74,35 @@ def main() -> None:
 	output_dir: Path = args.output_dir
 	output_dir.mkdir(parents=True, exist_ok=True)
 
-	# 1. Load JSON → DataFrame
-	df: pd.DataFrame = load_json_to_df(args.data)
+	# 1️⃣ Load data (JSON or CSV)
+	if not args.fields:
+		raise ValueError("Please specify the 4 fields using --fields field1 field2 field3 field4")
 
-	# 2-3. Combine text fields and generate embeddings
-	text_columns = ["problem", "findings", "limitations"]
+	df: pd.DataFrame = load_selected_fields(args.data, args.fields)
+	logging.info(f"Loaded {len(df)} rows with fields: {args.fields}")
+
+	# 2️⃣ Generate embeddings (auto-handles numeric/text)
 	embeddings = generate_embeddings(
 		df,
-		text_columns=text_columns,
+		text_columns=args.fields,  # dynamically chosen
 		model_name=args.model,
 		batch_size=args.batch_size,
 	)
 
-	# 4-5. KMeans clustering and PCA 2D reduction
+	# 3️⃣ KMeans clustering + PCA
 	labels, pca_2d, _ = run_clustering_and_pca(embeddings, n_clusters=args.clusters)
 
-	# 6. Attach results and visualize
+	# 4️⃣ Attach results & visualize
 	df_out = df.copy()
 	df_out["cluster"] = labels
-
 	plot_paths = create_interactive_visualizations(df_out, pca_2d, output_dir)
 
-	# 7. Save clustered results
+	# 5️⃣ Save results
 	csv_path = output_dir / "clustered_results.csv"
 	df_out.to_csv(csv_path, index=False)
-	logging.info("Saved clustered data to %s", csv_path)
+	logging.info(f"Saved clustered data to {csv_path}")
 
-	print("Outputs:")
+	print("\n✅ Outputs:")
 	print(f"- Clustered CSV: {csv_path}")
 	for name, path in plot_paths.items():
 		print(f"- {name.capitalize()} plot: {path}")
@@ -104,5 +110,3 @@ def main() -> None:
 
 if __name__ == "__main__":
 	main()
-
-
