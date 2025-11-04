@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -39,20 +39,21 @@ def create_interactive_visualizations(
 	scatter_df = df.copy()
 	scatter_df["pca_x"] = pca_2d[:, 0]
 	scatter_df["pca_y"] = pca_2d[:, 1]
+
+	# Build hover_data dynamically from available columns
+	hover_columns = {}
+	for col in df.columns:
+		if col not in ["pca_x", "pca_y"]:  # Exclude PCA columns from hover
+			hover_columns[col] = True
+
 	fig_scatter = px.scatter(
-    scatter_df,
-    x="pca_x",
-    y="pca_y",
-    color=scatter_df["cluster"].astype(str),
-    hover_data={
-        "longitude": True,
-        "latitude": True,
-        "population": True,
-        "ocean_proximity": True,
-        "cluster": True,
-    },
-    title="Clusters in 2D PCA Space (Housing Data)",
-)
+		scatter_df,
+		x="pca_x",
+		y="pca_y",
+		color=scatter_df["cluster"].astype(str),
+		hover_data=hover_columns,
+		title="Clusters in 2D PCA Space",
+	)
 
 	fig_scatter.update_layout(legend_title_text="Cluster")
 	scatter_path = output_dir / "clusters_scatter.html"
@@ -60,27 +61,35 @@ def create_interactive_visualizations(
 	plot_paths["scatter"] = scatter_path
 	logging.info("Saved scatter plot to %s", scatter_path)
 
-	# Yearly trend: number of publications per cluster per year
-	# trend_df = (
-	# 	df.assign(year=df["year"].astype(int))
-	# 	.groupby(["year", "cluster"], dropna=False)
-	# 	.size()
-	# 	.reset_index(name="count")
-	# )
-	# fig_trend = px.line(
-	# 	trend_df.sort_values(["year", "cluster"]),
-	# 	x="year",
-	# 	y="count",
-	# 	color=trend_df["cluster"].astype(str),
-	# 	hover_data={"cluster": True, "year": True, "count": True},
-	# 	title="Yearly Trend by Cluster",
-	# 	markers=True,
-	# # )
-	# fig_trend.update_layout(legend_title_text="Cluster")
-	# trend_path = output_dir / "yearly_trend.html"
-	# # fig_trend.write_html(str(trend_path), include_plotlyjs="cdn")
-	# plot_paths["trend"] = trend_path
-	# logging.info("Saved yearly trend plot to %s", trend_path)
+	# Yearly trend: number of publications per cluster per year (if year column exists)
+	if "year" in df.columns:
+		trend_df = (
+			df.assign(year=pd.to_numeric(df["year"], errors="coerce"))
+			.dropna(subset=["year"])
+			.groupby(["year", "cluster"], dropna=False)
+			.size()
+			.reset_index(name="count")
+		)
+
+		if len(trend_df) > 0:
+			fig_trend = px.line(
+				trend_df.sort_values(["year", "cluster"]),
+				x="year",
+				y="count",
+				color=trend_df["cluster"].astype(str),
+				hover_data={"cluster": True, "year": True, "count": True},
+				title="Yearly Trend by Cluster",
+				markers=True,
+			)
+			fig_trend.update_layout(legend_title_text="Cluster")
+			trend_path = output_dir / "yearly_trend.html"
+			fig_trend.write_html(str(trend_path), include_plotlyjs="cdn")
+			plot_paths["trend"] = trend_path
+			logging.info("Saved yearly trend plot to %s", trend_path)
+		else:
+			logging.warning("No valid year data found, skipping yearly trend plot")
+	else:
+		logging.info("No 'year' column found, skipping yearly trend plot")
 
 	return plot_paths
 

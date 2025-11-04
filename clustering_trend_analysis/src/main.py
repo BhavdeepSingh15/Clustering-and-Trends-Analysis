@@ -45,8 +45,20 @@ def main() -> None:
 	parser.add_argument(
 		"--clusters",
 		type=int,
-		default=3,
-		help="Number of KMeans clusters",
+		default=None,
+		help="Number of KMeans clusters. If not specified, will be automatically estimated using silhouette score.",
+	)
+	parser.add_argument(
+		"--auto-cluster-min",
+		type=int,
+		default=2,
+		help="Minimum number of clusters for automatic estimation (silhouette method)",
+	)
+	parser.add_argument(
+		"--auto-cluster-max",
+		type=int,
+		default=10,
+		help="Maximum number of clusters for automatic estimation (silhouette method)",
 	)
 	parser.add_argument(
 		"--model",
@@ -90,7 +102,12 @@ def main() -> None:
 	)
 
 	# 3️⃣ KMeans clustering + PCA
-	labels, pca_2d, _ = run_clustering_and_pca(embeddings, n_clusters=args.clusters)
+	labels, pca_2d, _ = run_clustering_and_pca(
+		embeddings,
+		n_clusters=args.clusters,
+		auto_cluster_min=args.auto_cluster_min,
+		auto_cluster_max=args.auto_cluster_max,
+	)
 
 	# 4️⃣ Attach results & visualize
 	df_out = df.copy()
