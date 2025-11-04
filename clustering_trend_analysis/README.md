@@ -83,3 +83,9 @@ Open the HTML files in a browser for interactive exploration.
 - You can adjust the number of clusters with `--clusters`.
 - If running on CPU, expect the first embedding pass to take longer due to model download.
 
+
+
+## How to run the main.py
+- python3 -m clustering_trend_analysis.src.main --data clustering_trend_analysis/data/housing.csv --fields longitude latitude population ocean_proximity   
+- change the fields according to the input data and also make the neccessary changes in the visualization.py fields
+- --data clustering_trend_analysis/data/housing.csv is the path for the input file
